@@ -104,7 +104,7 @@ RCSwitch::RCSwitch() {
   this->setProtocol(1);
   #if not defined( RCSwitchDisableReceiving )
   this->nReceiverInterrupt = -1;
-  this->setReceiveTolerance(60);
+  this->setReceiveTolerance(80);
   RCSwitch::nReceivedValue = 0;
   #endif
 }

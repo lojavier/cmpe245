@@ -13,6 +13,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#define Buffer_Size 128
+#define Sync_Field_Size 32
+
 RCSwitch mySwitch;
 
 unsigned char decToCharValue(unsigned char decimal)
@@ -50,20 +53,38 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    int pulseLength = 0;
+    // Default value of 1000
+    int pulseLength = 1000;
+    int confidence = 0;
+    if (argc == 1)
+    {
+        printf("Usage: %s [pulselength] [corruption]\n", argv[0]);
+        printf("pulselength\t- Pulselength in microseconds\n");
+        printf("confidence\t- The percentage of confidence level\n");
+        return -1;
+    }
+    
     if (argv[1] != NULL) pulseLength = atoi(argv[1]);
+    if (argc >= 3) confidence = atoi(argv[2]);
 
     mySwitch = RCSwitch();
-    if (pulseLength != 0) mySwitch.setPulseLength(pulseLength);
+    mySwitch.setPulseLength(pulseLength);
     mySwitch.enableReceive(PIN);  // Receiver on interrupt 0 => that is pin #2
 
-    unsigned char syncFieldByteErrorCount = 0;
-    unsigned char bitwiseSyncByte = SYNC_FIELD_1;
-    unsigned char bufferByteCount = 0;
-    unsigned char buffer[MAX_BUFFER_BYTES];
-    memset(buffer, 0, sizeof(buffer));
+    // unsigned char syncFieldByteErrorCount = 0;
+    // unsigned char bitwiseSyncByte = SYNC_FIELD_1;
+    // unsigned char bufferByteCount = 0;
+    // unsigned char buffer[MAX_BUFFER_BYTES];
+    // memset(buffer, 0, sizeof(buffer));
     // bool syncFieldMatch = false;
     // bool syncByteMatch = false;
+
+    int temp_match_percent[Buffer_Size - Sync_Field_Size] = {0};
+    unsigned char input_buffer[Buffer_Size];
+    char prefixes[2] = {0xA0, 0x50};
+    unsigned char sync_field_buffer[Sync_Field_Size] = {0};
+    int input_buffer_count, match_num, match_index = 0;
+    int index;
 
     while(1)
     {
@@ -78,114 +99,72 @@ int main(int argc, char *argv[])
             //     printf("Received %i\n", value);
             // }
 
-            if (bufferByteCount < MAX_BUFFER_BYTES - 1)
+            // if (bufferByteCount < MAX_BUFFER_BYTES - 1)
+            // {
+            //     // if (value != '\0' || value != 4)
+            //     if (value != 4)
+            //     {
+            //         printf("Received Byte: %u\n", value);
+            //     }
+            //     buffer[bufferByteCount] = value;
+            //     bufferByteCount++;
+            // }
+            if (input_buffer_count < Buffer_Size)
             {
-                // if (value != '\0' || value != 4)
                 if (value != 4)
                 {
-                    printf("Received Byte: %u\n", value);
+                    printf("Received Byte: %u (%c)\n", value, decToCharValue(value));
                 }
-                buffer[bufferByteCount] = value;
-                bufferByteCount++;
+                input_buffer[input_buffer_count] = value;
+                input_buffer_count++;
             }
             else
             {
-                buffer[bufferByteCount] = value;
-                bufferByteCount = 0;
+                input_buffer_count = 0;
 
-                for (int j = 0; j < MAX_SYNC_BYTES; j++)
+                // Create Sync field for matching
+                for(int i = 0; i < 2; i++)
                 {
-                    printf("%u ^ %u = %u\n", buffer[j], bitwiseSyncByte, (buffer[j] ^ bitwiseSyncByte));
-
-                    int x = bitwiseSyncByte - buffer[j];
-                    // if (buffer[j] ^ bitwiseSyncByte)
-                    if (x != 0)
+                    for(int j = 0; j < 16; j++)
                     {
-                        // j--;
-                        j -= (bitwiseSyncByte - buffer[j]);
-                        syncFieldByteErrorCount++;
-                    }
-
-                    // bitwiseSyncByte++;
-                    bitwiseSyncByte += x;
-
-                    if (bitwiseSyncByte == 176)
-                    {
-                        bitwiseSyncByte = SYNC_FIELD_2;
-                    }
-                    else if (bitwiseSyncByte == 96)
-                    {
-                        break;
+                        index = i * 16 + j;
+                        sync_field_buffer[index] = prefixes[i] + j;
                     }
                 }
-
-                printf("Sync Field Byte Error Count: %u\n", syncFieldByteErrorCount);
-
-                for (uint i = (MAX_SYNC_BYTES - syncFieldByteErrorCount); i < MAX_BUFFER_BYTES; i++)
+                
+                for(int i = 0; i < Buffer_Size - Sync_Field_Size; i++)
                 {
-                    if (buffer[i] == '\0' || buffer[i] == 4)
+                    for(int j = 0; j < Sync_Field_Size; j++)
                     {
-                        break;
+                        if(input_buffer[i + j] == sync_field_buffer[j]) 
+                            match_num++;
                     }
-                    else
-                    {
-                        printf("%c", decToCharValue(buffer[i]));
-                    }
+                    temp_match_percent[i] = match_num;
+                    if(temp_match_percent[match_index] < match_num) match_index = i;
+                    match_num = 0;
                 }
-                printf("\n");
+                
+                int input_index = match_index + Sync_Field_Size;
+                double match_percent = ( (double)temp_match_percent[match_index] / Sync_Field_Size ) * 100;
 
-                memset(buffer, 0, sizeof(buffer));
-                syncFieldByteErrorCount = 0;
-                bitwiseSyncByte = SYNC_FIELD_1;
-
-                // for (uint i = 0; i < MAX_BUFFER_BYTES; i++)
-                // {
-                //     if (buffer[i] == '\0' || buffer[i] == 6)
-                //     {
-                //         break;
-                //     }
-                //     else if (syncFieldMatch)
-                //     {
-                //         for (uint j = i; j < (i + MAX_SYNC_BYTES - 1); j++)
-                //         {
-                //             if (buffer[j] & bitwiseSyncByte)
-                //                 bitwiseSyncByte++;
-                //             else
-                //             {
-                //                 syncFieldByteErrorCount++;
-                //                 j--;
-                //             }
-                            
-                //             if (j == 16)
-                //                 bitwiseSyncByte = SYNC_FIELD_2;
-
-                //         }
-                //         printf("Sync Field Error Byte Count: %d\n", syncFieldByteErrorCount);
-                //         syncFieldByteErrorCount = 0;
-                //     }
-                //     else if (buffer[i] & bitwiseSyncByte)
-                //     {
-                //         syncFieldMatch = true;
-                //         bitwiseSyncByte++;
-                //     }
-                //     else
-                //     {
-                //         for (uint j = 0; j < MAX_SYNC_BYTES - 1; j++)
-                //         {
-                //             if (j == 16)
-                //             {
-
-                //             }
-                //         }
-                //     }
-                // }
+                if(match_percent >= confidence)
+                {
+                    printf("Success: Payload found with confidence level %d%% at index %d\n", confidence, input_index);
+                    printf("Payload: ");
+                    for(int i=match_index + Sync_Field_Size; i< match_index + Sync_Field_Size + 23; i++)    printf("%c", input_buffer[i]);
+                    printf("\n");
+                }
+                else
+                {
+                    printf("Failed: Cannot find payload with confidence level %d%%\n", confidence);             
+                }
             }
 
             fflush(stdout);
             mySwitch.resetAvailable();
         }
 
-        usleep(100);
+        usleep(500);
     }
 
     exit(0);
