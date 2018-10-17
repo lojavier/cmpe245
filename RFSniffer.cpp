@@ -59,13 +59,11 @@ int main(int argc, char *argv[])
 
     unsigned char syncFieldByteErrorCount = 0;
     unsigned char bitwiseSyncByte = SYNC_FIELD_1;
-    // uint bitwiseSync1 = SYNC_FIELD_1;
-    // uint bitwiseSync2 = SYNC_FIELD_2;
     unsigned char bufferByteCount = 0;
     unsigned char buffer[MAX_BUFFER_BYTES];
     memset(buffer, 0, sizeof(buffer));
-    bool syncFieldMatch = false;
-    bool syncByteMatch = false;
+    // bool syncFieldMatch = false;
+    // bool syncByteMatch = false;
 
     while(1)
     {
@@ -95,16 +93,21 @@ int main(int argc, char *argv[])
                 buffer[bufferByteCount] = value;
                 bufferByteCount = 0;
 
-                for (uint j = 0; j < MAX_SYNC_BYTES; j++)
+                for (int j = 0; j < MAX_SYNC_BYTES; j++)
                 {
-                    // printf("%u ^ %u = %u\n", buffer[j], bitwiseSyncByte, (buffer[j] ^ bitwiseSyncByte));
-                    if (buffer[j] ^ bitwiseSyncByte)
+                    printf("%u ^ %u = %u\n", buffer[j], bitwiseSyncByte, (buffer[j] ^ bitwiseSyncByte));
+
+                    int x = bitwiseSyncByte - buffer[j];
+                    // if (buffer[j] ^ bitwiseSyncByte)
+                    if (x != 0)
                     {
-                        j--;
+                        // j--;
+                        j -= (bitwiseSyncByte - buffer[j]);
                         syncFieldByteErrorCount++;
                     }
 
-                    bitwiseSyncByte++;
+                    // bitwiseSyncByte++;
+                    bitwiseSyncByte += x;
 
                     if (bitwiseSyncByte == 176)
                     {

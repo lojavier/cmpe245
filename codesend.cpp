@@ -63,7 +63,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Change protocol and pulse length accroding to parameters
-    int code = atoi(argv[1]);
+    // int code = atoi(argv[1]);
+    char *payloadString = argv[1];
     if (argc >= 3) protocol = atoi(argv[2]);
     if (argc >= 4) pulseLength = atoi(argv[3]);
     
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
     // Send Payload w/offset
     uint c = 0;
     uint payloadByte = 0;
-    char payloadString[MAX_PAYLOAD_BYTES] = "SJSU_CMPE245_LORENZO_9623";
+    // char payloadString[MAX_PAYLOAD_BYTES] = "SJSU_CMPE245_LORENZO_9623";
     while (payloadString[c] != '\0')
     {
     	payloadByte = (unsigned)payloadString[c];
